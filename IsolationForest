@@ -1,0 +1,87 @@
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.ensemble import IsolationForest
+import mysql.connector
+
+# Function to connect to MySQL database and fetch data
+def fetch_data_from_mysql(host, user, password, database, query):
+    try:
+        # Connect to MySQL
+        conn = mysql.connector.connect(host=host, user=user, password=password, database=database)
+        cursor = conn.cursor()
+
+        # Execute SQL query
+        cursor.execute(query)
+
+        # Fetch data
+        data = cursor.fetchall()
+
+        # Close cursor and connection
+        cursor.close()
+        conn.close()
+
+        return data
+
+    except Exception as e:
+        print("Error fetching data from MySQL:", e)
+        return None
+
+# Function to preprocess data
+def preprocess_data(data):
+    # Convert fetched data into DataFrame
+    df = pd.DataFrame(data, columns=['timestamp', 'value'])  # Assuming the data has timestamp and value columns
+
+    # Convert timestamp to datetime
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+    return df
+
+# Function to visualize anomalies
+def visualize_anomalies(df, anomalies):
+    plt.figure(figsize=(12, 6))
+    plt.plot(df['timestamp'], df['value'], color='blue', label='Normal')
+    plt.scatter(anomalies['timestamp'], anomalies['value'], color='red', label='Anomaly')
+    plt.title('Anomaly Detection using Isolation Forest')
+    plt.xlabel('Timestamp')
+    plt.ylabel('Value')
+    plt.legend()
+    plt.show()
+
+# Main function for anomaly detection
+def detect_anomalies(host, user, password, database, query, contamination=0.01):
+    # Fetch data from MySQL
+    data = fetch_data_from_mysql(host, user, password, database, query)
+    if data is None:
+        return
+
+    # Preprocess data
+    df = preprocess_data(data)
+
+    # Select feature(s)
+    X = df[['value']]  # Assuming 'value' is the feature to be used for anomaly detection
+
+    # Initialize Isolation Forest model
+    model = IsolationForest(contamination=contamination)
+
+    # Fit the model
+    model.fit(X)
+
+    # Predict anomalies
+    predictions = model.predict(X)
+
+    # Extract anomalies
+    anomalies = df[predictions == -1]
+
+    # Visualize anomalies
+    visualize_anomalies(df, anomalies)
+
+# Example usage
+host = 'localhost'
+user = 'your_username'
+password = 'your_password'
+database = 'your_database'
+query = 'SELECT timestamp, value FROM your_table'
+
+detect_anomalies(host, user, password, database, query)
